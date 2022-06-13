@@ -1,0 +1,21 @@
+replicaCount: 1
+logLevel: info 
+
+image: 
+  name: ""
+
+nameOverride: ""
+fullnameOverride: ""
+
+ports:
+  protocol: TCP
+  port: 80 # what port is this? can it be kept the same as sentry and operator?
+  targetPort: 6700 # is this random?
+
+resources: {}
+runAsNonRoot: true
+
+debug:  
+  enabled: false 
+  port: 40000
+  initialDelaySeconds: 30000

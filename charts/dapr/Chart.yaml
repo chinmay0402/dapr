@@ -22,3 +22,6 @@ dependencies:
   - name: dapr_dashboard
     version: "0.9.0"
     repository: "file://dapr_dashboard"
+  - name: dapr_monitor
+    version: "0.7.0"
+    repository: "file://dapr_monitor"

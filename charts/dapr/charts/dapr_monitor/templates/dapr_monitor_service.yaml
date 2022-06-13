@@ -1,0 +1,13 @@
+# create service to load balance across pods 
+# and make discovery immune to ephemeral nature of pods
+kind: Service
+apiVersion: v1
+metadata:
+  name: dapr-monitor # this is the name of the service
+spec:
+  selector:
+    app: dapr-monitor # this is the name of the application the service targets -> meaning, it will listen on port {targetPort} on any pod that has app=dapr-monitor label
+  ports:
+  - protocol: TCP
+    port: {{ .Values.ports.port }} 
+    targetPort: {{ .Values.ports.targetPort }}  

@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dapr-monitor
+  labels: 
+    app: dapr-monitor
+spec: 
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: dapr-monitor
+  template:
+    metadata:
+      labels:
+        app: dapr-monitor
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Values.global.tag }}
+        app.kubernetes.io/component: monitor
+        app.kubernetes.io/part-of: "dapr"
+        app.kubernetes.io/managed-by: "helm"
+    spec:
+      containers:
+      - name: dapr-monitor
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 3
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 3
+          failureThreshold: 5
+{{- if contains "/" .Values.image.name }}
+        image: "{{ .Values.image.name }}"
+{{- else }}
+        image: "{{ .Values.global.registry }}/dapr:{{ .Values.global.tag }}"
+{{- end }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+{{- if eq .Values.global.daprControlPlaneOs "linux" }}
+        securityContext:
+          runAsNonRoot: {{ .Values.runAsNonRoot }}
+{{- end }}
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        ports:
+        - containerPort: 6700
+#         resources:
+# {{ toYaml .Values.resources | indent 10 }}
+#         volumeMounts:
+#           - name: credentials
+#             mountPath: /var/run/dapr/credentials
+#             readOnly: true
+        command:
+        - "/monitor"
+        args:
+        - "--log-level"
+        - {{ .Values.logLevel }}
+{{- if eq .Values.global.logAsJson true }}
+        - "--log-as-json"
+{{- end }}
+        - "--enable-metrics=false"
+      serviceAccountName: dapr-operator
+#       volumes:
+#         - name: credentials
+#           secret:
+#             secretName: dapr-trust-bundle
+#       affinity:
+#         nodeAffinity:
+#           requiredDuringSchedulingIgnoredDuringExecution:
+#              nodeSelectorTerms:
+#                 - matchExpressions:
+#                   - key: kubernetes.io/os
+#                     operator: In
+#                     values:
+#                     - {{ .Values.global.daprControlPlaneOs }}
+# {{- if .Values.global.daprControlPlaneArch }}
+#                   - key: kubernetes.io/arch
+#                     operator: In
+#                     values:
+#                     - {{ .Values.global.daprControlPlaneArch }}
+# {{- end }}
+# {{- if .Values.global.imagePullSecrets }}
+#       imagePullSecrets:
+#         - name: {{ .Values.global.imagePullSecrets }}
+# {{- end }}
+{{- if .Values.global.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.global.nodeSelector | indent 8 }}
+{{- end }}
