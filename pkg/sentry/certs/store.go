@@ -25,6 +25,11 @@ func StoreCredentials(conf config.SentryConfig, rootCertPem, issuerCertPem, issu
 	return storeSelfhosted(rootCertPem, issuerCertPem, issuerKeyPem, conf.RootCertPath, conf.IssuerCertPath, conf.IssuerKeyPath)
 }
 
+// StoreRotatedCertsInKubernetes saves the trust bundle created by monitor after auto-rotation in a Kubernetes secret store
+func StoreRotatedCertsInKubernetes(rootCertPem, issuerCertPem, issuerKeyPem []byte) error {
+	return storeKubernetes(rootCertPem, issuerCertPem, issuerKeyPem)
+}
+
 func storeKubernetes(rootCertPem, issuerCertPem, issuerCertKey []byte) error {
 	kubeClient, err := kubernetes.GetClient()
 	if err != nil {

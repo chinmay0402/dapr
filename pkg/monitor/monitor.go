@@ -97,7 +97,7 @@ func getLogs(ctx context.Context) {
 	if err != nil {
 		log.Fatalf("could not get access to k8s, err: %s", err)
 	}
-
+	log.Info("getting logs every 30 seconds")
 	for {
 		// get list of all pods in all namespaces
 		pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{}) 
@@ -135,13 +135,18 @@ func getLogs(ctx context.Context) {
 			// process logs
 			process.ProcessLogs(logs)
 		}
-		time.Sleep(20 * time.Second)
+		time.Sleep(30 * time.Second)
 	}
 
 }
 
 func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName string, ctx context.Context) string {
-	podLogOpts := v1.PodLogOptions{} // TODO: look into pod options: Container, Follow, SinceSeconds
+	f := func(s int64) *int64 {
+        return &s
+    }
+	podLogOpts := v1.PodLogOptions{
+		SinceSeconds: f(60),
+	} // TODO: look into pod options: Container, Follow, SinceSeconds
 	if podNamespace != daprNamespace {
 		// get logs for daprd container only since app specific errors cannot be handled anyways
 		podLogOpts.Container = "daprd"
