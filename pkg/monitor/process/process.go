@@ -3,9 +3,11 @@ package process
 import (
 	"strings"
 	"time"
+
+	"github.com/dapr/dapr/pkg/monitor/issuer"
+	// "github.com/dapr/dapr/pkg/sentry/ca"
+	// "github.com/dapr/dapr/pkg/sentry/certs"
 	"github.com/dapr/kit/logger"
-	"github.com/dapr/dapr/pkg/sentry/certs"
-	"github.com/dapr/dapr/pkg/sentry/ca"
 )
 
 const (
@@ -17,12 +19,20 @@ var log = logger.NewLogger("dapr.monitor")
 func ProcessLogs(logs string) {
 	// search for keywords?
 	// how to create a logic flow?
-
-	if strings.Contains(logs, "x509") || strings.Contains(logs, "error") || strings.Contains(logs, "connection refused") {
-		log.Infof("Invalid certificate, renewing...")
+	log.Infof("entered process logs")
+	if strings.Contains(logs, "x509") || strings.Contains(logs, "error") || strings.Contains(logs, "Dashboard") {
+		log.Infof("Invalid certificate, renewal required")
+		// check if certs are dapr generated
+		issuerOrgName := issuer.GetIssuerMetadataFromConfigMap()
+		if issuerOrgName == "dapr.io/sentry" {
+			log.Infof("auto rotating certs...")
+		} else {
+			log.Infof("cannot auto rotate certs, issuer organization is: %s", issuerOrgName)
+		}
 		// insert rotate certificate logic here
 		// step 1 - create new certificates
 			// substep 1 - generate private key
+		/*
 		rootKey, err := certs.GenerateECPrivateKey()
 		if err != nil {
 			log.Fatalf("could not generate new EC private key, err: %s", err)
@@ -41,5 +51,6 @@ func ProcessLogs(logs string) {
 		}
 		// step 3 - log successful rotation
 		log.Infof("certificate rotation successful!")
+		*/
 	}
 }
