@@ -8,18 +8,13 @@ import (
 	"time"
 
 	"github.com/dapr/kit/logger"
-	"k8s.io/apimachinery/pkg/runtime"
 	runtimeutil "k8s.io/apimachinery/pkg/util/runtime"
-	// clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	// componentsapi "github.com/dapr/dapr/pkg/apis/components/v1alpha1"
-	// configurationapi "github.com/dapr/dapr/pkg/apis/configuration/v1alpha1"
-	// subscriptionsapi "github.com/dapr/dapr/pkg/apis/subscriptions/v1alpha1"
 	"github.com/dapr/dapr/pkg/health"
 	"github.com/dapr/dapr/pkg/monitor/process"
 )
@@ -37,21 +32,11 @@ type Monitor interface {
 }
 
 type monitor struct {
-	ctx context.Context // QQ: what is a context?
-	// mgr 		ctrl.Manager // QQ: what is manager?
-	// client 		client.Client // QQ: what is a client?
+	ctx context.Context 
 	instanceName string
 }
 
-var scheme = runtime.NewScheme() // QQ: what is a scheme?
-
-// func init() {
-// 	_ = clientgoscheme.AddToScheme(scheme)
-// 	_ = componentsapi.AddToScheme(scheme)
-// 	_ = configurationapi.AddToScheme(scheme)
-// 	_ = subscriptionsapi.AddToScheme(scheme)
-// }
-
+// returns a new monitor instance
 func NewMonitor() Monitor {
 	m := &monitor{
 		instanceName: "monitor-instance",
@@ -86,6 +71,7 @@ func (m *monitor) Run(ctx context.Context) {
 	getLogs(ctx)
 }
 
+// Periodically fetches logs from control plane service pods and annotated application pods
 func getLogs(ctx context.Context) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -140,6 +126,7 @@ func getLogs(ctx context.Context) {
 
 }
 
+// Fetches logs from a pod provided the pod
 func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName string, ctx context.Context) string {
 	f := func(s int64) *int64 {
         return &s
@@ -168,10 +155,11 @@ func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName st
 	return str
 }
 
+// Fetches annotations for given pod
 func getPodAnnotations(clientset *kubernetes.Clientset, podNamespace string, podName string) map[string]string {
 	pod, err := clientset.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
-		log.Fatal("could not get pod data, err: %s", err)
+		log.Fatalf("could not get pod data, err: %s", err)
 	}
 	return pod.GetAnnotations()
 }

@@ -32,7 +32,7 @@ const (
 )
 
 func main() {
-	logger.DaprVersion = version.Version() // log the dapr version
+	logger.DaprVersion = version.Version() 
 	log.Infof("starting Dapr Monitor -- version %s -- commit %s", version.Version(), version.Commit())
 	ctx := signals.Context()
 
@@ -73,8 +73,4 @@ func init() {
 	if err := metricsExporter.Init(); err != nil {
 		log.Fatal(err)
 	}
-
-	// if err := monitoring.InitMetrics(); err != nil {
-	// 	log.Fatal(err)
-	// }
 }

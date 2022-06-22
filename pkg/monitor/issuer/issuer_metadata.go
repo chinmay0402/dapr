@@ -15,6 +15,7 @@ const (
 
 var log = logger.NewLogger("dapr.sentry")
 
+// gets namespace for the ConfigMap
 func getNamespace() string {
 	namespace := os.Getenv("NAMESPACE")
 	if namespace == "" {
@@ -23,6 +24,7 @@ func getNamespace() string {
 	return namespace
 }
 
+// Fetches value of IssuerOrgName from ConfigMap to allow detection of dapr-generated certs
 func GetIssuerMetadataFromConfigMap() string {
 	log.Info("This function gets value from ConfigMap")
 	kubeClient, err := kubernetes.GetClient()
@@ -35,6 +37,8 @@ func GetIssuerMetadataFromConfigMap() string {
 		log.Fatalf("failed to retrive issuer metadata from kubernetes, err: %s", err)
 	}
 	issuerOrgName := configMap.Data["IssuerOrgName"]
+
 	// TODO: implement some kind of retry mech
+	
 	return issuerOrgName
 }
