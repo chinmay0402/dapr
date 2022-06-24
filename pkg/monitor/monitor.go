@@ -151,7 +151,7 @@ func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName st
 		log.Fatalf("error in copying logs from podLogs to buf, err: %s", err)
 	}
 	str := buf.String()
-	log.Infof("%s logs => %s", podName, str)
+	// log.Infof("%s logs => %s", podName, str)
 	return str
 }
 
