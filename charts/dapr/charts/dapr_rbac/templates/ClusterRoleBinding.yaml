@@ -84,8 +84,8 @@ rules:
     resources: ["services", "leases","pods","pods/log"]
     verbs: ["delete"]
   - apiGroups: ["*"]
-    resources: ["deployments", "services", "configmaps", "events", "leases","pods","pods/log"]
-    verbs: ["create"]
+    resources: ["deployments", "services", "configmaps", "events", "leases","pods","pods/log", "statefulsets"]
+    verbs: ["create", "patch"]
 {{- if .Values.secretReader.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

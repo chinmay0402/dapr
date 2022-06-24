@@ -36,7 +36,7 @@ type monitor struct {
 	instanceName string
 }
 
-// returns a new monitor instance
+// Returns a new monitor instance
 func NewMonitor() Monitor {
 	m := &monitor{
 		instanceName: "monitor-instance",
@@ -151,7 +151,10 @@ func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName st
 		log.Fatalf("error in copying logs from podLogs to buf, err: %s", err)
 	}
 	str := buf.String()
+	
+	// Uncomment below line to see fetched logs as monitor logs, do when demo-ing
 	// log.Infof("%s logs => %s", podName, str)
+
 	return str
 }
 

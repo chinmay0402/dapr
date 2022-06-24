@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func restart() {
+func restartPods() {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatalf("could not get config, err: %s", err)
@@ -29,6 +29,7 @@ func restart() {
 	}
 	log.Infof("sentry restart successful!")
 
+	// restart operator deployment and placement server statefulset
 	data = fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"%s"}}}},"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":"%s","maxSurge": "%s"}}}`, time.Now().String(), "25%", "25%")
 	_, err = clientset.AppsV1().Deployments("dapr-system").Patch(context.Background(), "dapr-operator", types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{FieldManager: "kubectl-rollout"})
 	if err != nil {
@@ -48,7 +49,7 @@ func restart() {
 
 		deploymentNamespace := item.GetObjectMeta().GetNamespace()
 		deploymentName := item.GetObjectMeta().GetName()
-		if deploymentNamespace != "default" {
+		if deploymentNamespace != "default" { // take action only for default namespace - TODO: change later to handle non-dapr-system and non-default namespace applications as well
 			continue
 		}
 		log.Infof("deployment namespace: %s, deployment name: %s", deploymentNamespace, deploymentName)

@@ -18,7 +18,7 @@ const (
 
 var log = logger.NewLogger("dapr.sentry")
 
-// gets namespace for the ConfigMap
+// Gets namespace for the ConfigMap
 func getNamespace() string {
 	namespace := os.Getenv("NAMESPACE")
 	if namespace == "" {
@@ -41,7 +41,7 @@ func GetIssuerMetadataFromConfigMap() string {
 	}
 	issuerOrgName := configMap.Data["IssuerOrgName"]
 
-	// TODO: implement some kind of retry mech
+	// TODO: look into some kind of retry mech
 	
 	return issuerOrgName
 }
@@ -84,6 +84,7 @@ func RegisterActionToConfigMap(actionId string) error {
 	return nil
 }
 
+// check if some action is already present in key-value store
 func CheckActionPresenceInConfigMap() string {
 	log.Info("This function gets action id from ConfigMap")
 	kubeClient, err := kubernetes.GetClient()
