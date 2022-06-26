@@ -20,10 +20,12 @@ var log = logger.NewLogger("dapr.monitor")
 
 // Checks for presence of keywords in logs and takes appropriate actions
 func ProcessLogs(logs string) {
-	if strings.Contains(logs, "fatal") && (strings.Contains(logs, "x509") || strings.Contains(logs, "error from authenticator CreateSignedWorkloadCert")) {
+	if strings.Contains(logs, "fatal") && (strings.Contains(logs, "x509") || strings.Contains(logs, "certificate") || strings.Contains(logs, "error from authenticator CreateSignedWorkloadCert")) {
+	// if strings.Contains(logs, "x509") || strings.Contains(logs, "node-subscriber") {
 		actionId := "1" // actionId for this scenario - other scenarios if added in the future should have unique action ids of their own
 
 		if getAction(actionId) != actionId { // check if actionId is present inside key-value store (TODO: change key-value store from ConfigMap to redis)
+			log.Infof("in processLogs. actionId is: %s", actionId)
 			log.Infof("Invalid certificate, renewal required")
 
 			issuerOrgName := issuer.GetIssuerMetadataFromConfigMap()
@@ -51,11 +53,14 @@ func ProcessLogs(logs string) {
 				log.Infof("certificate rotation successful, restart required...")
 
 				// persist action taken to key-value store
-				registerAction(actionId)
+				err = registerAction(actionId)
+				if err != nil {
+					log.Fatalf("couldn't register action to configmap, err: %s", err)
+				}
 
 				restartPods()
 
-				time.Sleep(600 * time.Second) // TODO: sleep to make demo convenient, remove later
+				time.Sleep(2 * time.Minute) // TODO: sleep to make demo convenient, remove later
 
 			} else {
 				log.Fatalf("cannot auto rotate certs, issuer organization is: %s", issuerOrgName)
@@ -68,10 +73,10 @@ func ProcessLogs(logs string) {
 
 
 // registers that an action of actionId was performed to the key-value store
-func registerAction(actionId string) {
+func registerAction(actionId string) error {
 	// currently register action to ConfigMap
 	// TODO: replace ConfigMap by redis or some other state store having TTL support
-	issuer.RegisterActionToConfigMap(actionId)
+	return issuer.RegisterActionToConfigMap(actionId)
 }
 
 // checks if an action was registered in a key-value store

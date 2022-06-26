@@ -20,6 +20,7 @@ import (
 )
 
 var log = logger.NewLogger("dapr.monitor")
+var fetchedBefore = make(map[string]int)
 
 const (
 	healthzPort = 8080
@@ -90,7 +91,6 @@ func getLogs(ctx context.Context) {
 		if err != nil {
 			log.Fatalf("could not get pods, err: %s", err)
 		}
-
 		for _, pod := range pods.Items {
 			if pod.Namespace == "kube-node-lease" || pod.Namespace == "kube-public" || pod.Namespace == "kube-system" {
 				// ignore k8s specific namespaces
@@ -112,6 +112,10 @@ func getLogs(ctx context.Context) {
 			}
 			// get annotations here, get logs if annotations are valid
 			annotations := getPodAnnotations(clientset, pod.Namespace, pod.Name)
+			if annotations["notFound"] == "true" {
+				log.Infof("pod %s was not found, skipping", pod.Name)
+				continue
+			}
 			value, isPresent := annotations[daprAnnotationsMonitorEnabledKey]
 			if pod.Namespace != daprNamespace && (isPresent == false || value == "false") {
 				continue
@@ -130,10 +134,16 @@ func getLogs(ctx context.Context) {
 func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName string, ctx context.Context) string {
 	f := func(s int64) *int64 {
         return &s
-    }
+    } 
 	podLogOpts := v1.PodLogOptions{
 		SinceSeconds: f(60),
-	} // TODO: look into pod options: Container, Follow, SinceSeconds
+	}
+
+	if fetchedBefore[podName] == 0 { // if logs have never been fetched from given pod before, fetch all pods
+		podLogOpts = v1.PodLogOptions{}
+		fetchedBefore[podName] = 1
+	}
+
 	if podNamespace != daprNamespace {
 		// get logs for daprd container only since app specific errors cannot be handled anyways
 		podLogOpts.Container = "daprd"
@@ -153,7 +163,7 @@ func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName st
 	str := buf.String()
 	
 	// Uncomment below line to see fetched logs as monitor logs, do when demo-ing
-	// log.Infof("%s logs => %s", podName, str)
+	log.Infof("%s logs => %s", podName, str)
 
 	return str
 }
@@ -161,8 +171,15 @@ func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName st
 // Fetches annotations for given pod
 func getPodAnnotations(clientset *kubernetes.Clientset, podNamespace string, podName string) map[string]string {
 	pod, err := clientset.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+	errorMap := make(map[string]string)
 	if err != nil {
-		log.Fatalf("could not get pod data, err: %s", err)
+		if strings.HasSuffix(err.Error(), "not found") {
+			errorMap["notFound"] = "true"
+			// it is possible the pod was not yet created, or was terminated hence return nil
+			return errorMap
+		} else {
+			log.Fatalf("could not get pod data, err: %s", err)
+		}
 	}
 	return pod.GetAnnotations()
 }
