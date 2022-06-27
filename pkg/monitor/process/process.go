@@ -20,14 +20,14 @@ var log = logger.NewLogger("dapr.monitor")
 
 // Checks for presence of keywords in logs and takes appropriate actions
 func ProcessLogs(logs string) {
-	if strings.Contains(logs, "fatal") && (strings.Contains(logs, "x509") || strings.Contains(logs, "certificate") || strings.Contains(logs, "error from authenticator CreateSignedWorkloadCert")) {
+	if strings.Contains(logs, "fatal") && (strings.Contains(logs, "x509") || strings.Contains(logs, "PEM") ||strings.Contains(logs, "certificate") || strings.Contains(logs, "error from authenticator CreateSignedWorkloadCert")) {
 	// if strings.Contains(logs, "x509") || strings.Contains(logs, "node-subscriber") {
 		actionId := "1" // actionId for this scenario - other scenarios if added in the future should have unique action ids of their own
 
 		if checkActionPresenceInConfigMap(actionId) != actionId { // check if actionId is present inside key-value store (TODO: change key-value store from ConfigMap to redis)
 			log.Infof("Invalid certificate, renewal required")
 
-			issuerOrgName := issuer.GetIssuerMetadataFromConfigMap()
+			issuerOrgName := issuer.ReadKeyFromConfigMap("IssuerOrgName")
 
 			// check if certs are dapr generated
 			if issuerOrgName == daprGeneratedIssuerOrgName {
@@ -80,10 +80,10 @@ func ProcessLogs(logs string) {
 func registerAction(actionId string) error {
 	// currently register action to ConfigMap
 	// TODO: replace ConfigMap by redis or some other state store having TTL support
-	return issuer.RegisterActionToConfigMap(actionId)
+	return issuer.WriteToConfigMap("actionId",actionId)
 }
 
 // checks if an action was registered in a key-value store
 func checkActionPresenceInConfigMap(actionId string) string {
-	return issuer.CheckActionPresenceInConfigMap()
+	return issuer.ReadKeyFromConfigMap("actionId")
 }
