@@ -11,10 +11,10 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func restartPods() {
+func restartPods() error {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Fatalf("could not get config, err: %s", err)
+		return err
 	}
 
 	// create the clientset
@@ -25,7 +25,7 @@ func restartPods() {
 	data := fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"%s"}}}},"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":"%s","maxSurge": "%s"}}}`, time.Now().String(), "25%", "25%")
 	_, err = clientset.AppsV1().Deployments("dapr-system").Patch(context.Background(), "dapr-sentry", types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{FieldManager: "kubectl-rollout"})
 	if err != nil {
-		log.Fatalf("couldn't restart sentry, err: %s", err)
+		return err
 	}
 	log.Infof("sentry restart successful!")
 
@@ -33,14 +33,14 @@ func restartPods() {
 	data = fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"%s"}}}},"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":"%s","maxSurge": "%s"}}}`, time.Now().String(), "25%", "25%")
 	_, err = clientset.AppsV1().Deployments("dapr-system").Patch(context.Background(), "dapr-operator", types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{FieldManager: "kubectl-rollout"})
 	if err != nil {
-		log.Fatalf("couldn't restart operator, err: %s", err)
+		return err
 	}
 	log.Infof("operator restart successful!")
 
 	data = fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"%s"}}}},"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":"%s","maxSurge": "%s"}}}`, time.Now().String(), "25%", "25%")
 	_, err = clientset.AppsV1().StatefulSets("dapr-system").Patch(context.Background(), "dapr-placement-server", types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{FieldManager: "kubectl-rollout"})
 	if err != nil {
-		log.Fatalf("couldn't restart statefulset placement server, err: %s", err)
+		return err
 	}
 	log.Infof("statefulset placement server restart successful!")
 	
@@ -57,8 +57,10 @@ func restartPods() {
 		data := fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"%s"}}}},"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":"%s","maxSurge": "%s"}}}`, time.Now().String(), "25%", "25%")
 		_, err = clientset.AppsV1().Deployments(deploymentNamespace).Patch(context.Background(), deploymentName, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{FieldManager: "kubectl-rollout"})
 		if err != nil {
-			log.Fatalf("couldn't restart deployment, err: %s", err)
+			return err
 		}
 		log.Infof("restart successful!")
 	}
+
+	return nil
 }

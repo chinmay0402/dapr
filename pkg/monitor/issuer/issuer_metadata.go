@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	configMapName = "dapr-config-map"
 	defaultSecretNamespace = "default"
 )
 
@@ -36,7 +37,7 @@ func GetIssuerMetadataFromConfigMap() string {
 		log.Fatalf("could not get kubernetes client, err: %s", err)
 	}
 	namespace := getNamespace()
-	configMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), "dapr-config-map", metav1.GetOptions{})
+	configMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatalf("failed to retrive configmap from kubernetes, err: %s", err)
 	}
@@ -54,7 +55,6 @@ func RegisterActionToConfigMap(actionId string) error {
 		return err
 	}
 	namespace := getNamespace()
-	configMapName := "dapr-config-map"
 	currentConfigMap := getConfigMap() // get config map
 	currentConfigMap["actionId"] = actionId // add action id field
 
@@ -77,7 +77,7 @@ func RegisterActionToConfigMap(actionId string) error {
 		_, err = kubeClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	}
 	if err != nil {
-		return errors.Wrap(err, "failed registering action id to kubernetes")
+		return errors.Wrap(err, "failed to register action id to kubernetes")
 	}
 	log.Infof("successfully registered action to configmap")
 	CheckActionPresenceInConfigMap()
@@ -88,14 +88,14 @@ func RegisterActionToConfigMap(actionId string) error {
 	return nil
 }
 
+// gets configmap from kubernetes
 func getConfigMap() map[string]string {
-	log.Info("This function gets ConfigMap")
 	kubeClient, err := kubernetes.GetClient()
 	if err != nil {
 		log.Fatalf("could not get kubernetes client, err: %s", err)
 	}
+
 	namespace := getNamespace()
-	configMapName := "dapr-config-map"
 	if _, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{}); apiErrors.IsNotFound(err) {
 		// if map was not found create one
 		configMap := &v1.ConfigMap{
@@ -109,11 +109,12 @@ func getConfigMap() map[string]string {
 			},
 			Data: make(map[string]string),
 		}
-		confMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+		log.Infof("configmap not found, creating...")
+		newConfigMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
 		if err != nil {
 			log.Infof("failed to create config map, err: %s", err)
 		}
-		return confMap.Data
+		return newConfigMap.Data
 	} else {
 		configMap, _ := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{})
 		return configMap.Data
@@ -126,11 +127,6 @@ func CheckActionPresenceInConfigMap() string {
 
 	actionId := configMap["actionId"]
 
-	for k, v := range configMap {
-		log.Infof("%s : %s", k, v)
-	}
-
-	log.Infof("action Id is: %s", actionId);
 	// TODO: implement some kind of retry mech
 	
 	return actionId

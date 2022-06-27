@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	selfSignedRootCertLifetime = time.Hour * 56
-	allowedClockSkew           = time.Minute * 15
+	selfSignedRootCertLifetime = time.Hour * 56 // TODO: increase validity
+	allowedClockSkew           = time.Minute * 2 // TODO: make 15 later
 	daprGeneratedIssuerOrgName = "dapr.io/sentry"
 )
 
@@ -24,8 +24,7 @@ func ProcessLogs(logs string) {
 	// if strings.Contains(logs, "x509") || strings.Contains(logs, "node-subscriber") {
 		actionId := "1" // actionId for this scenario - other scenarios if added in the future should have unique action ids of their own
 
-		if getAction(actionId) != actionId { // check if actionId is present inside key-value store (TODO: change key-value store from ConfigMap to redis)
-			log.Infof("in processLogs. actionId is: %s", actionId)
+		if checkActionPresenceInConfigMap(actionId) != actionId { // check if actionId is present inside key-value store (TODO: change key-value store from ConfigMap to redis)
 			log.Infof("Invalid certificate, renewal required")
 
 			issuerOrgName := issuer.GetIssuerMetadataFromConfigMap()
@@ -33,24 +32,25 @@ func ProcessLogs(logs string) {
 			// check if certs are dapr generated
 			if issuerOrgName == daprGeneratedIssuerOrgName {
 				log.Infof("auto rotating certs...")
+
 				rootKey, err := certs.GenerateECPrivateKey()
 				if err != nil {
 					log.Fatalf("could not generate new EC private key, err: %s", err)
 				}
+
 				_, rootCertPem, issuerCertPem, issuerKeyPem, err := ca.GetNewSelfSignedCertificates(
 					rootKey, selfSignedRootCertLifetime, allowedClockSkew)
 				if err != nil {
 					log.Fatalf("could not get new self-signed certificates, err: %s", err)
 				}
-				log.Infof("generated new certificates, root.crt: %s\n issuer.crt: %s\n issuer.key: %s\n", rootCertPem, issuerCertPem, issuerKeyPem)
+				log.Infof("generated new certificates")
 
 				log.Infof("uploading certs to secrets...")
 				err = certs.StoreRotatedCertsInKubernetes(rootCertPem, issuerCertPem, issuerKeyPem)
 				if err != nil {
 					log.Fatalf("could not upload certificate to k8s, err: %s", err)
 				}
-
-				log.Infof("certificate rotation successful, restart required...")
+				log.Infof("certificate rotation successful, restarting pods...")
 
 				// persist action taken to key-value store
 				err = registerAction(actionId)
@@ -58,7 +58,11 @@ func ProcessLogs(logs string) {
 					log.Fatalf("couldn't register action to configmap, err: %s", err)
 				}
 
-				restartPods()
+				err = restartPods()
+				if err != nil {
+					log.Fatalf("couldn't restart pods, err: %s", err)
+				}
+				log.Infof("restart successful!")
 
 				time.Sleep(2 * time.Minute) // TODO: sleep to make demo convenient, remove later
 
@@ -80,6 +84,6 @@ func registerAction(actionId string) error {
 }
 
 // checks if an action was registered in a key-value store
-func getAction(actionId string) string {
+func checkActionPresenceInConfigMap(actionId string) string {
 	return issuer.CheckActionPresenceInConfigMap()
 }

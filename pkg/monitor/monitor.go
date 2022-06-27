@@ -20,12 +20,15 @@ import (
 )
 
 var log = logger.NewLogger("dapr.monitor")
+
+// keeps track of whether logs for a particular pod were even fetched before
 var fetchedBefore = make(map[string]int)
 
 const (
 	healthzPort = 8080
-	daprAnnotationsMonitorEnabledKey = "dapr.io/enable-monitor"
 	daprNamespace = "dapr-system"
+	daprSidecarContainer = "daprd"
+	daprAnnotationsMonitorEnabledKey = "dapr.io/enable-monitor"
 )
 
 type Monitor interface {
@@ -100,9 +103,11 @@ func getLogs(ctx context.Context) {
 				// don't monitor logs of dapr-monitor itself
 				continue
 			}
+
 			containsSidecar := false
 			for container := range pod.Spec.Containers {
-				if pod.Spec.Containers[container].Name == "daprd" {
+				// check if pod contains dapr sidecar
+				if pod.Spec.Containers[container].Name == daprSidecarContainer {
 					containsSidecar = true
 					break
 				}
@@ -110,14 +115,17 @@ func getLogs(ctx context.Context) {
 			if containsSidecar == false && pod.Namespace != daprNamespace {
 				continue
 			}
+
 			// get annotations here, get logs if annotations are valid
 			annotations := getPodAnnotations(clientset, pod.Namespace, pod.Name)
 			if annotations["notFound"] == "true" {
-				log.Infof("pod %s was not found, skipping", pod.Name)
+				// skip if pod with given name was found
+				// not throwing error because it was most probably not found due to sync issues
 				continue
 			}
-			value, isPresent := annotations[daprAnnotationsMonitorEnabledKey]
-			if pod.Namespace != daprNamespace && (isPresent == false || value == "false") {
+
+			value, annotationPresent := annotations[daprAnnotationsMonitorEnabledKey]
+			if pod.Namespace != daprNamespace && (annotationPresent == false || value == "false") {
 				continue
 			}
 
@@ -132,14 +140,15 @@ func getLogs(ctx context.Context) {
 
 // Fetches logs from a pod provided the pod
 func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName string, ctx context.Context) string {
-	f := func(s int64) *int64 {
+	convert := func(s int64) *int64 {
         return &s
     } 
 	podLogOpts := v1.PodLogOptions{
-		SinceSeconds: f(60),
+		SinceSeconds: convert(60), // by default logs are fetched for the past 60 seconds
 	}
 
-	if fetchedBefore[podName] == 0 { // if logs have never been fetched from given pod before, fetch all pods
+	if fetchedBefore[podName] == 0 { 
+		// if logs have never been fetched from given pod before, fetch all pods
 		podLogOpts = v1.PodLogOptions{}
 		fetchedBefore[podName] = 1
 	}
@@ -148,6 +157,7 @@ func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName st
 		// get logs for daprd container only since app specific errors cannot be handled anyways
 		podLogOpts.Container = "daprd"
 	}
+
 	req := clientset.CoreV1().Pods(podNamespace).GetLogs(podName, &podLogOpts)
 	podLogs, err := req.Stream(ctx)
 	if err != nil {
@@ -162,20 +172,19 @@ func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName st
 	}
 	str := buf.String()
 	
-	// Uncomment below line to see fetched logs as monitor logs, do when demo-ing
-	log.Infof("%s logs => %s", podName, str)
+	log.Infof("%s logs: %s", podName, str)
 
 	return str
 }
 
-// Fetches annotations for given pod
+// Returns annotations for pod passed as param
 func getPodAnnotations(clientset *kubernetes.Clientset, podNamespace string, podName string) map[string]string {
 	pod, err := clientset.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 	errorMap := make(map[string]string)
 	if err != nil {
 		if strings.HasSuffix(err.Error(), "not found") {
 			errorMap["notFound"] = "true"
-			// it is possible the pod was not yet created, or was terminated hence return nil
+			// it is possible the pod was not yet created, or was terminated hence return a customMap that denotes pod is not present
 			return errorMap
 		} else {
 			log.Fatalf("could not get pod data, err: %s", err)
