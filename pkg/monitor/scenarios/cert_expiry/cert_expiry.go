@@ -76,7 +76,7 @@ func (ce CertExpiry) Remediate() {
 			}
 			log.Infof("restart successful!")
 
-			time.Sleep(2 * time.Minute) // TODO: sleep to make demo convenient, remove later
+			time.Sleep(1 * time.Minute) 
 
 		} else {
 			log.Fatalf("cannot auto rotate certs, issuer organization is: %s", issuerOrgName)

@@ -25,9 +25,9 @@ var log = logger.NewLogger("dapr.monitor")
 var fetchedBefore = make(map[string]int)
 
 const (
-	healthzPort = 8080
-	daprNamespace = "dapr-system"
-	daprSidecarContainer = "daprd"
+	healthzPort                      = 8080
+	daprNamespace                    = "dapr-system"
+	daprSidecarContainer             = "daprd"
 	daprAnnotationsMonitorEnabledKey = "dapr.io/enable-monitor"
 )
 
@@ -36,7 +36,7 @@ type Monitor interface {
 }
 
 type monitor struct {
-	ctx context.Context 
+	ctx          context.Context
 	instanceName string
 }
 
@@ -87,35 +87,14 @@ func getLogs(ctx context.Context) {
 	if err != nil {
 		log.Fatalf("could not get access to k8s, err: %s", err)
 	}
-	log.Info("getting logs every 30 seconds")
+	log.Info("getting logs every 30 seconds...")
 	for {
 		// get list of all pods in all namespaces
-		pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{}) 
+		pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Fatalf("could not get pods, err: %s", err)
 		}
 		for _, pod := range pods.Items {
-			if pod.Namespace == "kube-node-lease" || pod.Namespace == "kube-public" || pod.Namespace == "kube-system" {
-				// ignore k8s specific namespaces
-				continue
-			}
-			if pod.Namespace == daprNamespace && strings.Contains(pod.Name, "dapr-monitor") {
-				// don't monitor logs of dapr-monitor itself
-				continue
-			}
-
-			containsSidecar := false
-			for container := range pod.Spec.Containers {
-				// check if pod contains dapr sidecar
-				if pod.Spec.Containers[container].Name == daprSidecarContainer {
-					containsSidecar = true
-					break
-				}
-			}
-			if containsSidecar == false && pod.Namespace != daprNamespace {
-				continue
-			}
-
 			// get annotations here, get logs if annotations are valid
 			annotations := getPodAnnotations(clientset, pod.Namespace, pod.Name)
 			if annotations["notFound"] == "true" {
@@ -124,31 +103,27 @@ func getLogs(ctx context.Context) {
 				continue
 			}
 
-			value, annotationPresent := annotations[daprAnnotationsMonitorEnabledKey]
-			if pod.Namespace != daprNamespace && (annotationPresent == false || value == "false") {
-				continue
-			}
+			value, _ := annotations[daprAnnotationsMonitorEnabledKey]
+			if (pod.Namespace == daprNamespace && !strings.Contains(pod.Name, "dapr-monitor")) || (value == "true") {
+				logs := getPodLogs(clientset, pod.Namespace, pod.Name, ctx) // get logs of the pod
 
-			logs := getPodLogs(clientset, pod.Namespace, pod.Name, ctx) // get logs of the pod
-			// process logs
-			// process.ProcessLogs(logs)
-			process.ProcessLogs(logs)
+				process.ProcessLogs(logs)
+			}
 		}
 		time.Sleep(30 * time.Second)
 	}
-
 }
 
 // Fetches logs from a pod provided the pod
 func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName string, ctx context.Context) string {
 	convert := func(s int64) *int64 {
-        return &s
-    } 
+		return &s
+	}
 	podLogOpts := v1.PodLogOptions{
 		SinceSeconds: convert(60), // by default logs are fetched for the past 60 seconds
 	}
 
-	if fetchedBefore[podName] == 0 { 
+	if fetchedBefore[podName] == 0 {
 		// if logs have never been fetched from given pod before, fetch all pods
 		podLogOpts = v1.PodLogOptions{}
 		fetchedBefore[podName] = 1
@@ -172,7 +147,7 @@ func getPodLogs(clientset *kubernetes.Clientset, podNamespace string, podName st
 		log.Fatalf("error in copying logs from podLogs to buf, err: %s", err)
 	}
 	str := buf.String()
-	
+
 	log.Infof("%s logs: %s", podName, str)
 
 	return str
