@@ -1,4 +1,4 @@
-package issuer
+package configmap
 
 import (
 	"context"
@@ -71,9 +71,6 @@ func WriteToConfigMap(key string, value string) error {
 func ReadKeyFromConfigMap(key string) string {
 	configMap := getConfigMap()
 	val := configMap[key]
-	
-	// TODO: implement some kind of retry mech
-	
 	return val
 }
 

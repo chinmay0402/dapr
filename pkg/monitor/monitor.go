@@ -131,6 +131,7 @@ func getLogs(ctx context.Context) {
 
 			logs := getPodLogs(clientset, pod.Namespace, pod.Name, ctx) // get logs of the pod
 			// process logs
+			// process.ProcessLogs(logs)
 			process.ProcessLogs(logs)
 		}
 		time.Sleep(30 * time.Second)
