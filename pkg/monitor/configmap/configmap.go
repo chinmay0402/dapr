@@ -2,7 +2,7 @@ package configmap
 
 import (
 	"context"
-	// "os"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/dapr/dapr/pkg/sentry/kubernetes"
@@ -21,23 +21,21 @@ var log = logger.NewLogger("dapr.sentry")
 
 // Gets namespace for the ConfigMap
 func getNamespace() string {
-	// namespace := os.Getenv("NAMESPACE")
-	// if namespace == "" {
-	// 	namespace = defaultSecretNamespace
-	// }
-	namespace := "dapr-system"
+	namespace := os.Getenv("NAMESPACE")
+	if namespace == "" {
+		namespace = defaultSecretNamespace
+	}
 	return namespace
 }
 
 func WriteToConfigMap(key string, value string) error {
-	log.Info("This function registers an action to ConfigMap")
 	kubeClient, err := kubernetes.GetClient()
 	if err != nil {
 		return err
 	}
 	namespace := getNamespace()
 	currentConfigMap := getConfigMap() // get config map
-	currentConfigMap[key] = value // add action id field
+	currentConfigMap[key] = value // add key-value pair
 
 	configMap := &v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -50,7 +48,6 @@ func WriteToConfigMap(key string, value string) error {
 		},
 		Data: currentConfigMap,
 	}
-	log.Infof("created configmap update object")
 	if _, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{}); apiErrors.IsNotFound(err) { 
 		// create configMap if not already present
 		_, err = kubeClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
@@ -58,23 +55,23 @@ func WriteToConfigMap(key string, value string) error {
 		_, err = kubeClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	}
 	if err != nil {
-		return errors.Wrap(err, "failed to register action id to kubernetes")
+		return errors.Wrap(err, "failed to register action to kubernetes")
 	}
-	log.Infof("successfully registered action to configmap")
+	log.Infof("successfully registered action for %s to configmap", key)
 
-	ReadKeyFromConfigMap(key)
+	ReadKeyFromConfigMap(key) // what if remove?
 
 	return nil
 }
 
-// check if some action is already present in key-value store
+// Check if some action is already present in key-value store
 func ReadKeyFromConfigMap(key string) string {
 	configMap := getConfigMap()
 	val := configMap[key]
 	return val
 }
 
-// gets configmap from kubernetes
+// Gets configmap from kubernetes
 func getConfigMap() map[string]string {
 	kubeClient, err := kubernetes.GetClient()
 	if err != nil {

@@ -1,6 +1,7 @@
 package process
 
 import (
+	"strings"
 	certExpiry "github.com/dapr/dapr/pkg/monitor/scenarios/cert_expiry"
 	"github.com/dapr/kit/logger"
 )
@@ -13,14 +14,12 @@ type ErrorHandler interface {
 }
 
 func ProcessLogs(logs string) {
-	switch {
-	// refactor to map for error detection
-	// if fatal
-	// map[string] ErrorHandler
-	case certExpiry.NewCertExpiry().Detect(logs):
-		remediate(certExpiry.NewCertExpiry()) // TODO: rename action
+	if(strings.Contains(logs, "fatal")){
+		switch {
+		case certExpiry.NewCertExpiry().Detect(logs):
+			remediate(certExpiry.NewCertExpiry()) 
+		}
 	}
-	// 
 	
 }
 

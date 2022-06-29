@@ -23,6 +23,7 @@ const (
 	selfSignedRootCertLifetime = time.Hour * 56 // TODO: increase validity
 	allowedClockSkew           = time.Minute * 15 
 	daprGeneratedIssuerOrgName = "dapr.io/sentry"
+	issuerOrgKey 			   = "IssuerOrgName"
 )
 
 type CertExpiry struct{}
@@ -34,12 +35,12 @@ func NewCertExpiry() CertExpiry {
 
 // Initiates Action for CertExpiry scenario
 func (ce CertExpiry) Remediate() {
-	actionId := "1" // actionId for this scenario - other scenarios if added in the future should have unique action ids of their own
+	scenarioName := "cert-expiry" // actionId for this scenario - other scenarios if added in the future should have unique action ids of their own
 
-	if ce.checkActionPresenceInConfigMap(actionId) != actionId { // check if actionId is present inside key-value store (TODO: change key-value store from ConfigMap to redis)
+	if ce.checkActionPresenceInConfigMap(scenarioName) != "true" { // check if actionId is present inside key-value store (TODO: change key-value store from ConfigMap to redis)
 		log.Infof("Invalid certificate, renewal required")
 
-		issuerOrgName := configmap.ReadKeyFromConfigMap("IssuerOrgName")
+		issuerOrgName := configmap.ReadKeyFromConfigMap(issuerOrgKey)
 
 		// check if certs are dapr generated
 		if issuerOrgName == daprGeneratedIssuerOrgName {
@@ -65,7 +66,7 @@ func (ce CertExpiry) Remediate() {
 			log.Infof("certificate rotation successful, restarting pods...")
 
 			// persist action taken to key-value store
-			err = ce.registerAction(actionId)
+			err = ce.registerActionForScenario(scenarioName)
 			if err != nil {
 				log.Fatalf("couldn't register action to configmap, err: %s", err)
 			}
@@ -76,7 +77,7 @@ func (ce CertExpiry) Remediate() {
 			}
 			log.Infof("restart successful!")
 
-			time.Sleep(1 * time.Minute) 
+			time.Sleep(1 * time.Minute) // what if remove?
 
 		} else {
 			log.Fatalf("cannot auto rotate certs, issuer organization is: %s", issuerOrgName)
@@ -97,16 +98,16 @@ func (ce CertExpiry) Detect(logs string) bool {
 	return false
 }
 
-// Registers that an action of actionId was performed to the key-value store
-func (ce CertExpiry) registerAction(actionId string) error {
+// Registers that an action for scenarioName was performed to the key-value store
+func (ce CertExpiry) registerActionForScenario(scenarioName string) error {
 	// currently register action to ConfigMap
 	// TODO: replace ConfigMap by redis or some other state store having TTL support
-	return configmap.WriteToConfigMap("actionId",actionId)
+	return configmap.WriteToConfigMap(scenarioName, "true")
 }
 
 // Checks if an action was registered in a key-value store
-func (ce CertExpiry) checkActionPresenceInConfigMap(actionId string) string {
-	return configmap.ReadKeyFromConfigMap("actionId")
+func (ce CertExpiry) checkActionPresenceInConfigMap(scenarioName string) string {
+	return configmap.ReadKeyFromConfigMap(scenarioName)
 }
 
 // Restarts sentry, operator and placement control plane services along with application pods
