@@ -97,8 +97,8 @@ func getLogs(ctx context.Context) {
 		for _, pod := range pods.Items {
 			// get annotations here, get logs if annotations are valid
 			annotations := getPodAnnotations(clientset, pod.Namespace, pod.Name)
-			if annotations["notFound"] == "true" {
-				// skip if pod with given name was found
+			if annotations["notFound"] == "true"|| pod.Status.Phase == "Pending" {
+				// skip if pod with given name was found or container is still creating
 				// not throwing error because it was most probably not found due to sync issues
 				continue
 			}

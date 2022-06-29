@@ -1,45 +1,41 @@
-package issuer
+package configmap
 
 import (
 	"context"
 	"os"
 
-	"github.com/dapr/dapr/pkg/sentry/kubernetes"
-	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
+	"github.com/dapr/dapr/pkg/sentry/kubernetes"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/dapr/kit/logger"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
+	configMapName = "dapr-config-map"
 	defaultSecretNamespace = "default"
-	configMapName 		   = "dapr-config-map"
 )
 
 var log = logger.NewLogger("dapr.sentry")
 
-// Gets namespace in which the ConfigMap is present
+// Gets namespace for the ConfigMap
 func getNamespace() string {
 	namespace := os.Getenv("NAMESPACE")
 	if namespace == "" {
 		namespace = defaultSecretNamespace
 	}
-	return "dapr-system"
+	return namespace
 }
 
-// Writes the issuerOrgName to ConfigMap so that it can be fetched by dapr-monitor
-func WriteIssuerMetadataToConfigMap(issuerOrgName string) error {
-	log.Info("This function writes a value to ConfigMap")
+func WriteToConfigMap(key string, value string) error {
 	kubeClient, err := kubernetes.GetClient()
 	if err != nil {
 		return err
 	}
 	namespace := getNamespace()
-	configMapName := "dapr-config-map"
 	currentConfigMap := getConfigMap() // get config map
-	log.Infof("got config map")
-	currentConfigMap["IssuerOrgName"] = issuerOrgName
+	currentConfigMap[key] = value // add key-value pair
 
 	configMap := &v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -52,7 +48,6 @@ func WriteIssuerMetadataToConfigMap(issuerOrgName string) error {
 		},
 		Data: currentConfigMap,
 	}
-
 	if _, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{}); apiErrors.IsNotFound(err) { 
 		// create configMap if not already present
 		_, err = kubeClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
@@ -60,26 +55,32 @@ func WriteIssuerMetadataToConfigMap(issuerOrgName string) error {
 		_, err = kubeClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	}
 	if err != nil {
-		return errors.Wrap(err, "failed saving issuer metadata to kubernetes")
+		return errors.Wrap(err, "failed to persists key in kubernetes")
 	}
-	// _, err = kubeClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
-	// if err != nil {
-	// 	return errors.Wrap(err, "failed saving issuer metadata to kubernetes")
-	// }
+	log.Infof("successfully persisted key %s in configmap", key)
+
+	ReadKeyFromConfigMap(key) // what if remove?
+
 	return nil
 }
 
+// Check if some action is already present in key-value store
+func ReadKeyFromConfigMap(key string) string {
+	configMap := getConfigMap()
+	val := configMap[key]
+	return val
+}
+
+// Gets configmap from kubernetes
 func getConfigMap() map[string]string {
-	log.Info("This function in sentry gets ConfigMap")
 	kubeClient, err := kubernetes.GetClient()
 	if err != nil {
 		log.Fatalf("could not get kubernetes client, err: %s", err)
 	}
+
 	namespace := getNamespace()
-	configMapName := "dapr-config-map"
 	if _, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{}); apiErrors.IsNotFound(err) {
 		// if map was not found create one
-		log.Infof("in here?")
 		configMap := &v1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ConfigMap",
@@ -91,13 +92,13 @@ func getConfigMap() map[string]string {
 			},
 			Data: make(map[string]string),
 		}
-		confMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+		log.Infof("configmap not found, creating...")
+		newConfigMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
 		if err != nil {
 			log.Infof("failed to create config map, err: %s", err)
 		}
-		return confMap.Data
+		return newConfigMap.Data
 	} else {
-		log.Infof("map was found")
 		configMap, _ := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{})
 		if configMap.Data == nil {
 			return make(map[string]string)
@@ -105,3 +106,4 @@ func getConfigMap() map[string]string {
 		return configMap.Data
 	}
 }
+

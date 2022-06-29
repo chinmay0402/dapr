@@ -5,7 +5,8 @@ import (
 	"time"
 
 	"github.com/dapr/dapr/pkg/sentry/certs"
-	"github.com/dapr/dapr/pkg/sentry/issuer"
+	"github.com/dapr/dapr/pkg/configmap"
+
 )
 
 // TrustRootBundle represents the root certificate, issuer certificate and their
@@ -38,7 +39,7 @@ func (t *trustRootBundle) GetIssuerCertExpiry() *time.Time {
 	if t.issuerCreds == nil || t.issuerCreds.Certificate == nil {
 		return nil
 	}
-	err := issuer.WriteIssuerMetadataToConfigMap(t.issuerCreds.Certificate.Issuer.Organization[0])
+	err := configmap.WriteToConfigMap("IssuerOrgName", t.issuerCreds.Certificate.Issuer.Organization[0])
 	if err != nil {
 		log.Fatalf("couldn't save issuer data to configmap, err: %s", err)
 	}
