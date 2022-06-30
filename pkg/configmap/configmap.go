@@ -55,11 +55,9 @@ func WriteToConfigMap(key string, value string) error {
 		_, err = kubeClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	}
 	if err != nil {
-		return errors.Wrap(err, "failed to persists key in kubernetes")
+		return errors.Wrap(err, "failed to persist key in kubernetes") 
 	}
 	log.Infof("successfully persisted key %s in configmap", key)
-
-	ReadKeyFromConfigMap(key) // what if remove?
 
 	return nil
 }

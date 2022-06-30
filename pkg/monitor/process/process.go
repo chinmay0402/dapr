@@ -14,7 +14,7 @@ type ErrorHandler interface {
 }
 
 func ProcessLogs(logs string) {
-	if(strings.Contains(logs, "fatal")){
+	if(strings.Contains(logs, "fatal") || strings.Contains(logs, "warning")){
 		switch {
 		case certExpiry.NewCertExpiry().Detect(logs):
 			remediate(certExpiry.NewCertExpiry()) 
