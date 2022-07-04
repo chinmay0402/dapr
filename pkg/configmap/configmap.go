@@ -95,6 +95,7 @@ func getConfigMap() map[string]string {
 		if err != nil {
 			log.Infof("failed to create config map, err: %s", err)
 		}
+		newConfigMap.Data = make(map[string]string)
 		return newConfigMap.Data
 	} else {
 		configMap, _ := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{})
